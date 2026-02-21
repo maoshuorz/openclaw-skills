@@ -1,96 +1,84 @@
 #!/usr/bin/env python3
 """
-Twitter/X 自动发帖
+Twitter/X 自动发帖 - 支持图片
 """
 
 import sys
+import os
 import json
-import time
-import random
-import hashlib
-import base64
-import urllib.parse
-import hmac
 import requests
+from requests_oauthlib import OAuth1
 
 class Twitter:
     def __init__(self, consumer_key, consumer_secret, access_token, access_token_secret):
-        self.consumer_key = consumer_key
-        self.consumer_secret = consumer_secret
-        self.access_token = access_token
-        self.access_token_secret = access_token_secret
+        self.auth = OAuth1(
+            consumer_key,
+            client_secret=consumer_secret,
+            resource_owner_key=access_token,
+            resource_owner_secret=access_token_secret
+        )
     
-    def _create_oauth_header(self, url, method, body=None):
-        oauth_params = {
-            'oauth_consumer_key': self.consumer_key,
-            'oauth_nonce': base64.urlsafe_b64encode(str(random.random()).encode()).decode()[:32],
-            'oauth_signature_method': 'HMAC-SHA1',
-            'oauth_timestamp': str(int(time.time())),
-            'oauth_token': self.access_token,
-            'oauth_version': '1.0'
-        }
+    def upload_media(self, image_path):
+        """上传图片"""
+        with open(image_path, 'rb') as f:
+            img_data = f.read()
         
-        all_params = dict(oauth_params)
-        if body:
-            all_params.update(body)
+        resp = requests.post(
+            'https://upload.twitter.com/1.1/media/upload.json',
+            auth=self.auth,
+            files={'media': (os.path.basename(image_path), img_data, 'image/png')}
+        )
         
-        params_str = '&'.join([f'{urllib.parse.quote(k, safe="")}={urllib.parse.quote(str(v), safe="")}' 
-                              for k, v in sorted(all_params.items())])
-        
-        signature_base = f'{method}&{urllib.parse.quote(url, safe="")}&{urllib.parse.quote(params_str, safe="")}'
-        signing_key = f'{urllib.parse.quote(self.consumer_secret, safe="")}&{urllib.parse.quote(self.access_token_secret, safe="")}'
-        
-        signature = base64.b64encode(hmac.new(signing_key.encode(), signature_base.encode(), hashlib.sha1).digest()).decode()
-        oauth_params['oauth_signature'] = signature
-        
-        return 'OAuth ' + ', '.join([f'{k}="{urllib.parse.quote(v, safe="")}"' for k, v in oauth_params.items()])
+        if resp.status_code == 200:
+            return resp.json().get('media_id_string')
+        else:
+            raise Exception(f'Media upload failed: {resp.text}')
     
-    def post(self, text):
-        """发布推文"""
-        url = "https://api.twitter.com/2/tweets"
-        method = "POST"
-        body = json.dumps({"text": text})
+    def post(self, text, image_path=None):
+        """发帖，可选带图片"""
+        media_ids = []
+        if image_path:
+            media_id = self.upload_media(image_path)
+            media_ids.append(media_id)
         
-        auth_header = self._create_oauth_header(url, method, {"text": text})
+        body = {"text": text}
+        if media_ids:
+            body["media"] = {"media_ids": media_ids}
         
-        resp = requests.post(url, 
-            headers={'Authorization': auth_header, 'Content-Type': 'application/json'},
-            data=body)
+        resp = requests.post(
+            'https://api.twitter.com/2/tweets',
+            auth=self.auth,
+            json=body
+        )
         
         return resp.json()
     
-    def search(self, query, limit=10):
-        """搜索推文"""
-        # 需要 Bearer Token
-        return {"error": "Search requires Bearer Token"}
-    
     def get_me(self):
-        """获取当前用户信息"""
-        url = "https://api.twitter.com/2/users/me"
-        method = "GET"
-        
-        auth_header = self._create_oauth_header(url, method)
-        
-        resp = requests.get(url, headers={'Authorization': auth_header})
+        resp = requests.get('https://api.twitter.com/2/users/me', auth=self.auth)
         return resp.json()
 
 if __name__ == '__main__':
-    if len(sys.argv) < 6:
-        print("Usage: python twitter.py <ck> <cs> <at> <as> <command> [args]")
-        print("Commands: post <text> | me")
+    # 凭证
+    consumer_key = os.environ.get('TWITTER_CONSUMER_KEY', 'YOUR_CONSUMER_KEY')
+    consumer_secret = os.environ.get('TWITTER_CONSUMER_SECRET', 'YOUR_CONSUMER_SECRET')
+    access_token = os.environ.get('TWITTER_ACCESS_TOKEN', 'YOUR_ACCESS_TOKEN')
+    access_token_secret = os.environ.get('TWITTER_ACCESS_SECRET', 'YOUR_ACCESS_TOKEN_SECRET')
+    
+    client = Twitter(consumer_key, consumer_secret, access_token, access_token_secret)
+    
+    args = sys.argv[1:]
+    if not args:
+        print("Usage:")
+        print("  python twitter.py post <text> [image]")
+        print("  python twitter.py me")
         sys.exit(1)
     
-    ck = sys.argv[1]
-    cs = sys.argv[2]
-    at = sys.argv[3]
-    as_ = sys.argv[4]
-    cmd = sys.argv[5]
-    
-    client = Twitter(ck, cs, at, as_)
+    cmd = args[0]
     
     if cmd == 'post':
-        text = ' '.join(sys.argv[6:])
-        result = client.post(text)
+        text = args[1]
+        image = args[2] if len(args) > 2 else None
+        result = client.post(text, image)
     elif cmd == 'me':
         result = client.get_me()
     else:
