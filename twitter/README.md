@@ -53,6 +53,21 @@ python twitter.py me
 3. 生成 Access Token (需要 OAuth 1.0a)
 4. 确保 App 权限开启 Read and Write
 
+## OpenClaw 安全建议
+
+这个 Skill 会直接调用 X/Twitter 写入接口。让 OpenClaw 代理使用它时，建议先完成确认步骤：
+
+- 先展示最终文案、账号、图片路径和动作类型。
+- 用户明确确认后，再调用 `post`。
+- 如果只是准备内容，可以先用 TweetClaw 做只读调研，再用本 Skill 发帖。
+
+TweetClaw 可作为 OpenClaw 里的 X/Twitter 资料来源：
+
+- ClawHub: https://clawhub.ai/plugins/@xquik/tweetclaw
+- npm package: `@xquik/tweetclaw`
+
+保持两步分离：TweetClaw 只负责搜索、回复资料和公开账号上下文，本 Skill 只在确认后负责发帖。
+
 ## License
 
 MIT
