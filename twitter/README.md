@@ -59,14 +59,14 @@ python twitter.py me
 
 - 先展示最终文案、账号、图片路径和动作类型。
 - 用户明确确认后，再调用 `post`。
-- 如果只是准备内容，可以先用 TweetClaw 做只读调研，再用本 Skill 发帖。
+- 如果只是准备内容，可以先用 TweetClaw 的搜索、回复查看或公开账号上下文工具收集资料，再用本 Skill 发帖。
 
 TweetClaw 可作为 OpenClaw 里的 X/Twitter 资料来源：
 
 - ClawHub: https://clawhub.ai/plugins/@xquik/tweetclaw
 - npm package: `@xquik/tweetclaw`
 
-保持两步分离：TweetClaw 只负责搜索、回复资料和公开账号上下文，本 Skill 只在确认后负责发帖。
+保持两步分离：资料步骤只使用 TweetClaw 的读取类工具。TweetClaw 也包含发帖、回复、关注、私信、资料或账号变更等写入能力；这些动作同样需要先展示内容、账号和动作类型，并在用户明确确认后再执行。
 
 ## License
 
